@@ -7,7 +7,9 @@ class Restaurant:
         self._reservations: list[Reservation] = []
 
     def create_reservation(self, customer_name: str, party_size: int, date: str, time: str) -> Reservation:
-        raise NotImplementedError
+        reservation = Reservation.create(customer_name, party_size, date, time)
+        self._reservations.append(reservation)
+        return reservation
 
     def check_availability(self, date: str, time: str) -> int:
         raise NotImplementedError
