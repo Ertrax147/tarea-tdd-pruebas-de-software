@@ -23,11 +23,13 @@ class Restaurant:
             raise ValueError(f"{field_name} is required")
 
     def check_availability(self, date: str, time: str) -> int:
-        reserved = sum(
+        return self.capacity_per_slot - self._get_reserved_capacity(date, time)
+
+    def _get_reserved_capacity(self, date: str, time: str) -> int:
+        return sum(
             res.party_size for res in self._reservations
             if res.date == date and res.time == time and res.status == "active"
         )
-        return self.capacity_per_slot - reserved
 
     def cancel_reservation(self, reservation_id: str) -> bool:
         raise NotImplementedError
