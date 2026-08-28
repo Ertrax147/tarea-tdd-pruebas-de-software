@@ -120,3 +120,70 @@ tests\test_reservation.py ............... [100%]
 ## Ciclo 3 - Pendiente
 
 ## Ciclo 4 - Consultas + Reporte
+
+### 1. Comportamiento a implementar
+El comportamiento buscado era permitir consultar todas las reservas asociadas a una fecha determinada mediante `Restaurant.get_reservations_by_date`, retornando únicamente las reservas cuya fecha coincide con la solicitada.
+
+### 2. RED - Prueba inicial
+Commit RED: `test: add test for filtering reservations by date`
+
+Se creó el archivo `tests/test_queries.py` con la siguiente prueba:
+
+​```python
+def test_get_reservations_by_date_returns_only_matching_date(restaurant):
+    restaurant.create_reservation("Juan Pérez", 4, "2026-09-01", "20:00")
+    restaurant.create_reservation("Ana López", 2, "2026-09-01", "21:00")
+    restaurant.create_reservation("Pedro Gómez", 3, "2026-09-01", "19:30")
+    restaurant.create_reservation("Otro Cliente", 2, "2026-09-02", "20:00")
+
+    reservations = restaurant.get_reservations_by_date("2026-09-01")
+
+    assert len(reservations) == 3
+    assert all(r.date == "2026-09-01" for r in reservations)
+​```
+
+### 3. ¿Por qué falló?
+Comando ejecutado:
+
+​```powershell
+pytest tests/test_queries.py
+​```
+
+Resultado:
+
+​```text
+FAILED tests/test_queries.py::test_get_reservations_by_date_returns_only_matching_date - NotImplementedError
+src\reservation\restaurant.py:32: NotImplementedError
+1 failed in 0.10s
+​```
+
+El fallo ocurrió porque `Restaurant.get_reservations_by_date` todavía contenía `raise NotImplementedError`, es decir, el comportamiento de RF04 aún no estaba implementado. No se trató de un error de sintaxis, imports ni configuración: la prueba expuso correctamente una funcionalidad pendiente.
+
+### 4. GREEN - Implementación mínima
+Commit GREEN: `feat: implement get_reservations_by_date`
+
+Se reemplazó el método en `src/reservation/restaurant.py`:
+
+​```python
+def get_reservations_by_date(self, date: str) -> list[Reservation]:
+    return [r for r in self._reservations if r.date == date]
+​```
+
+Comando ejecutado:
+
+​```powershell
+pytest tests/test_queries.py
+​```
+
+Resultado:
+
+​```text
+collected 1 item                                                                                                                              
+
+tests\test_queries.py .                                                                                                                 [100%]
+
+=============================================================
+ 1 passed in 0.06s
+==============================================================
+​```
+
