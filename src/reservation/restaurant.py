@@ -13,6 +13,9 @@ class Restaurant:
         self._validate_required_text(date, "date")
         self._validate_required_text(time, "time")
 
+        if party_size > self.check_availability(date, time):
+            raise ValueError("Not enough capacity")
+
         reservation = Reservation.create(customer_name, party_size, date, time)
         self._reservations.append(reservation)
         return reservation
