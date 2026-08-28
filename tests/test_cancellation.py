@@ -24,3 +24,13 @@ def test_cancel_already_cancelled_raises_error():
     
     with pytest.raises(ValueError, match="ya está cancelada"):
         restaurant.cancel_reservation(reservation.id)
+
+def test_cancel_reservation_frees_capacity():
+    restaurant = Restaurant(capacity_per_slot=30)
+    reservation = restaurant.create_reservation("Cliente C", 10, "2026-08-30", "19:00")
+    
+    initial_capacity = restaurant.check_availability("2026-08-30", "19:00")
+    restaurant.cancel_reservation(reservation.id)
+    restored_capacity = restaurant.check_availability("2026-08-30", "19:00")
+    
+    assert restored_capacity == initial_capacity + 10
