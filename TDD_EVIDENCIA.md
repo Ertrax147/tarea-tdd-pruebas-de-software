@@ -119,7 +119,11 @@ tests\test_reservation.py ............... [100%]
 
 ## Ciclo 3 - Pendiente
 
-## Ciclo 4 - Consultas + Reporte
+## Funcionalidad: RF04 - Consultar Reservas
+
+Los siguientes 2 ciclos documentan el desarrollo de `Restaurant.get_reservations_by_date`. La evidencia fue reconstruida ejecutando pytest sobre cada commit real de la rama `feature/RF-04`.
+
+### Ciclo 1 - Filtrar reservas por fecha
 
 ### 1. Comportamiento a implementar
 El comportamiento buscado era permitir consultar todas las reservas asociadas a una fecha determinada mediante `Restaurant.get_reservations_by_date`, retornando únicamente las reservas cuya fecha coincide con la solicitada.
@@ -162,7 +166,7 @@ El fallo ocurrió porque `Restaurant.get_reservations_by_date` todavía contení
 ### 4. GREEN - Implementación mínima
 Commit GREEN: `feat: implement get_reservations_by_date`
 
-Se reemplazó el método en `src/reservation/restaurant.py`:
+Se reemplazó el método en `src/reservation/restaurant.py` por coincidencia de fecha:
 
 ​```python
 def get_reservations_by_date(self, date: str) -> list[Reservation]:
@@ -186,4 +190,40 @@ tests\test_queries.py .                                                         
  1 passed in 0.06s
 ==============================================================
 ​```
+Con este cambio, la prueba pasó (1 passed).
+
+#### 4. REFACTOR - Mejora realizada
+El método resultante tenía una sola responsabilidad y una condición simple, por lo que en este ciclo puntual no se identificó una mejora estructural adicional.
+
+---
+
+### Ciclo 2 - Excluir reservas canceladas
+
+#### 1. Comportamiento a implementar
+Las reservas con `status == "cancelled"` no deben aparecer en el resultado de `get_reservations_by_date`, aunque coincidan con la fecha consultada. Para mantener esta prueba autocontenida y no depender de la implementación de `cancel_reservation` (responsabilidad de RF03), el estado cancelado se simula asignando directamente el atributo `status` de la reserva.
+
+#### 2. RED - Prueba escrita inicialmente
+Commit: `test: exclude cancelled reservations from date query`
+
+```python
+def test_get_reservations_by_date_excludes_cancelled(restaurant):
+    active = restaurant.create_reservation("Juan Pérez", 4, "2026-09-01", "20:00")
+    cancelled = restaurant.create_reservation("Ana López", 2, "2026-09-01", "21:00")
+    cancelled.status = "cancelled"
+
+    reservations = restaurant.get_reservations_by_date("2026-09-01")
+
+    assert len(reservations) == 1
+    assert reservations[0].id == active.id
+```
+
+**Por qué falló:**
+```text
+    assert len(reservations) == 1
+E   AssertionError: assert 2 == 1
+E    +  where 2 = len([Reservation(id='f86ab840-...', ..., status='active'), Reservation(id='ac06c961-...', ..., status='cancelled')])
+tests\test_queries.py:28: AssertionError
+1 failed, 1 passed in 0.10s
+```
+`get_reservations_by_date` filtraba únicamente por `date`, sin considerar el `status` de la reserva. Por eso la reserva cancelada seguía apareciendo en el resultado junto con la activa.
 

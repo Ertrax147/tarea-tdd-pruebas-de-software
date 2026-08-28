@@ -28,4 +28,5 @@ class Restaurant:
     def cancel_reservation(self, reservation_id: str) -> bool:
         raise NotImplementedError
 
-    def get_reservations_by_date(self, date: str) -> list[Reservation]: return [r for r in self._reservations if r.date == date]
+    def get_reservations_by_date(self, date: str) -> list[Reservation]:
+        return [r for r in self._reservations if self._matches_active_date(r, date)]
