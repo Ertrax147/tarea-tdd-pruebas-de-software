@@ -8,3 +8,9 @@ def test_cancel_valid_reservation_changes_status():
     
     updated_res = next(r for r in restaurant._reservations if r.id == reservation.id)
     assert updated_res.status == "cancelled"
+
+def test_cancel_nonexistent_code_returns_false():
+    restaurant = Restaurant(capacity_per_slot=30)
+    result = restaurant.cancel_reservation("FAKE-ID")
+    
+    assert result is False
