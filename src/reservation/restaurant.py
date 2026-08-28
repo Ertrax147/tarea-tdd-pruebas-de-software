@@ -26,11 +26,13 @@ class Restaurant:
         raise NotImplementedError
 
     def cancel_reservation(self, reservation_id: str) -> bool:
-            reservation = next((r for r in self._reservations if r.id == reservation_id), None)
-            if reservation:
-                reservation.status = "cancelled"
-                return True
+        reservation = next((r for r in self._reservations if r.id == reservation_id), None)
+        
+        if reservation is None:
             return False
+            
+        reservation.status = "cancelled"
+        return True
 
     def get_reservations_by_date(self, date: str) -> list[Reservation]:
         raise NotImplementedError
