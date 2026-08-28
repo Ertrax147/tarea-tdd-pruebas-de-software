@@ -35,7 +35,16 @@ class Restaurant:
         )
 
     def cancel_reservation(self, reservation_id: str) -> bool:
-        raise NotImplementedError
+        reservation = next((r for r in self._reservations if r.id == reservation_id), None)
+        
+        if reservation is None:
+            return False
+            
+        if reservation.status == "cancelled":
+            raise ValueError("La reserva ya está cancelada")
+            
+        reservation.status = "cancelled"
+        return True
 
     def get_reservations_by_date(self, date: str) -> list[Reservation]:
         raise NotImplementedError
