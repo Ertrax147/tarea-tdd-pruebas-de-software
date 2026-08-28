@@ -1,3 +1,4 @@
+import pytest
 from src.reservation.restaurant import Restaurant
 
 def test_cancel_valid_reservation_changes_status():
@@ -14,3 +15,12 @@ def test_cancel_nonexistent_code_returns_false():
     result = restaurant.cancel_reservation("FAKE-ID")
     
     assert result is False
+
+def test_cancel_already_cancelled_raises_error():
+    restaurant = Restaurant(capacity_per_slot=30)
+    reservation = restaurant.create_reservation("Cliente B", 2, "2026-08-30", "21:00")
+    
+    restaurant.cancel_reservation(reservation.id)
+    
+    with pytest.raises(ValueError, match="ya está cancelada"):
+        restaurant.cancel_reservation(reservation.id)
