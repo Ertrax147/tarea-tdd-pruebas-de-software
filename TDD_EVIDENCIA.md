@@ -119,4 +119,4 @@ tests\test_reservation.py ............... [100%]
 
 ## Ciclo 3 - Pendiente
 
-## Ciclo 4 - Pendiente
+## Ciclo 4 - Consultas + Reporte
