@@ -7,18 +7,20 @@ class Restaurant:
         self._reservations: list[Reservation] = []
 
     def create_reservation(self, customer_name: str, party_size: int, date: str, time: str) -> Reservation:
-        if customer_name is None or customer_name.strip() == "":
-            raise ValueError("customer_name is required")
+        self._validate_required_text(customer_name, "customer_name")
         if party_size is None or party_size <= 0:
             raise ValueError("party_size must be greater than zero")
-        if date is None or date.strip() == "":
-            raise ValueError("date is required")
-        if time is None or time.strip() == "":
-            raise ValueError("time is required")
+        self._validate_required_text(date, "date")
+        self._validate_required_text(time, "time")
 
         reservation = Reservation.create(customer_name, party_size, date, time)
         self._reservations.append(reservation)
         return reservation
+
+    @staticmethod
+    def _validate_required_text(value: str | None, field_name: str) -> None:
+        if value is None or value.strip() == "":
+            raise ValueError(f"{field_name} is required")
 
     def check_availability(self, date: str, time: str) -> int:
         raise NotImplementedError
