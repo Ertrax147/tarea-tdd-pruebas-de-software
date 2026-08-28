@@ -252,3 +252,36 @@ tests/test_queries.py::test_get_reservations_by_date_excludes_cancelled PASSED  
 
 ======================================================================= 2 passed in 0.02s =======================================================================
 ```
+
+#### 4. REFACTOR - Mejora realizada
+Commit: - `refactor: extract active-date matching condition`
+
+La condición combinaba dos criterios (`fecha` y `status`) dentro de la comprehension, lo que reducía su legibilidad. Se extrajo a un método privado con nombre expresivo:
+
+```python
+def get_reservations_by_date(self, date: str) -> list[Reservation]:
+    return [r for r in self._reservations if self._matches_active_date(r, date)]
+
+@staticmethod
+def _matches_active_date(reservation: Reservation, date: str) -> bool:
+    return reservation.date == date and reservation.status == "active"
+```
+
+El comportamiento observable no cambió; se confirmó ejecutando la suite completa, la cual continuó pasando en su totalidad.
+
+```text
+(venv) PS C:\Users\ASUS\Documents\GitHub\tarea-tdd-pruebas-de-software> pytest
+====================================================================== test session starts ======================================================================
+platform win32 -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\ASUS\Documents\GitHub\tarea-tdd-pruebas-de-software
+configfile: pyproject.toml
+testpaths: tests
+collected 17 items                                                                                                                                               
+
+tests\test_queries.py ..                                                                                                                                   [ 11%]
+tests\test_reservation.py ...............                                                                                                                  [100%]
+
+====================================================================== 17 passed in 0.04s =======================================================================
+```
+
+---
