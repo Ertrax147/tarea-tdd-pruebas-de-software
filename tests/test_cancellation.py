@@ -30,7 +30,7 @@ def test_cancel_reservation_frees_capacity():
     reservation = restaurant.create_reservation("Cliente C", 10, "2026-08-30", "19:00")
     
     initial_capacity = restaurant.check_availability("2026-08-30", "19:00")
+    assert initial_capacity == 20
     restaurant.cancel_reservation(reservation.id)
     restored_capacity = restaurant.check_availability("2026-08-30", "19:00")
-    
-    assert restored_capacity == initial_capacity + 10
+    assert restored_capacity == 30
