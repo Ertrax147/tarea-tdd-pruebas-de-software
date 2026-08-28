@@ -115,8 +115,58 @@ tests\test_reservation.py ............... [100%]
 | GREEN | Implementar el mínimo código requerido | Se agregaron validaciones en `Restaurant.create_reservation` y las pruebas pasaron |
 | REFACTOR | Mejorar el diseño sin cambiar comportamiento | Se extrajo `_validate_required_text` y todas las pruebas continúan pasando |
 
-## Ciclo 2 - Pendiente
+## Funcionalidad: RF02 - Consultar Disponibilidad
 
-## Ciclo 3 - Pendiente
+### Ciclo 2 - Disponibilidad completa
 
-## Ciclo 4 - Pendiente
+#### 1. Comportamiento a implementar
+El sistema debe permitir determinar la disponibilidad inicial del restaurante para una fecha y hora, devolviendo la capacidad máxima configurada (30 por defecto) cuando no hay reservas.
+
+#### 2. RED - Prueba escrita inicialmente
+Commit: `test: add RF02 red tests`
+Se escribió la prueba `test_availability_is_full_when_no_reservations_exist` que verifica que `check_availability` retorne 30.
+**Por qué falló:** Porque el método `check_availability` no estaba implementado y lanzaba un `NotImplementedError`.
+
+#### 3. GREEN - Implementación mínima
+Commit: `feat: implement availability calculation (green)`
+Se modificó `check_availability` para que simplemente retornara `self.capacity_per_slot`. Esto fue suficiente para hacer pasar la prueba.
+
+#### 4. REFACTOR - Mejora realizada
+Debido a la simplicidad del código (una sola línea), no existía oportunidad real de refactorización matemática o estructural, por lo que se mantuvo el código intacto, respetando la regla de no sobre-diseñar.
+
+
+### Ciclo 3 - Capacidad reducida
+
+#### 1. Comportamiento a implementar
+El sistema debe calcular las personas reservadas para una fecha/hora y restar esa cantidad a la capacidad total.
+
+#### 2. RED - Prueba escrita inicialmente
+Commit: `test: add capacity reduction red test`
+Se agregó la prueba `test_availability_is_reduced_by_existing_reservations` donde se reserva para 26 personas y se espera que la disponibilidad baje a 4.
+**Por qué falló:** Porque el código de la fase anterior devolvía siempre el número fijo 30.
+
+#### 3. GREEN - Implementación mínima
+Commit: `feat: implement capacity reduction calculation (green)`
+Se agregó lógica dentro de `check_availability` para recorrer la lista `_reservations`, sumar el `party_size` de las reservas activas en esa fecha/hora, y restarlo del total.
+
+#### 4. REFACTOR - Mejora realizada
+Commit: `refactor: extract reserved capacity calculation`
+Se identificó que `check_availability` estaba asumiendo mucha responsabilidad matemática. Se extrajo la lógica de suma y filtrado a un nuevo método privado `_get_reserved_capacity`, mejorando la legibilidad. Todas las pruebas siguieron pasando exitosamente.
+
+
+### Ciclo 4 - Rechazo por capacidad insuficiente
+
+#### 1. Comportamiento a implementar
+El sistema debe bloquear la creación de una reserva si el número de personas solicitadas excede la capacidad disponible.
+
+#### 2. RED - Prueba escrita inicialmente
+Commit: `test: add capacity rejection red test`
+Se agregó la prueba `test_create_reservation_exceeding_capacity_must_fail`, que intenta reservar para 6 personas cuando solo quedan 4, esperando un `ValueError`.
+**Por qué falló:** Porque `create_reservation` no realizaba ninguna validación de capacidad antes de guardar la reserva.
+
+#### 3. GREEN - Implementación mínima
+Commit: `feat: implement capacity validation for new reservations (green)`
+Se agregó un bloque condicional en `create_reservation` que lanza un `ValueError("Not enough capacity")` si `party_size > self.check_availability(date, time)`.
+
+#### 4. REFACTOR - Mejora realizada
+No se realizó refactorización adicional en este ciclo ya que la validación agregada era limpia, delegaba correctamente la verificación a `check_availability` y no introducía duplicación.

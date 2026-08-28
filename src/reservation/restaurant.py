@@ -13,6 +13,9 @@ class Restaurant:
         self._validate_required_text(date, "date")
         self._validate_required_text(time, "time")
 
+        if party_size > self.check_availability(date, time):
+            raise ValueError("Not enough capacity")
+
         reservation = Reservation.create(customer_name, party_size, date, time)
         self._reservations.append(reservation)
         return reservation
@@ -23,7 +26,13 @@ class Restaurant:
             raise ValueError(f"{field_name} is required")
 
     def check_availability(self, date: str, time: str) -> int:
-        raise NotImplementedError
+        return self.capacity_per_slot - self._get_reserved_capacity(date, time)
+
+    def _get_reserved_capacity(self, date: str, time: str) -> int:
+        return sum(
+            res.party_size for res in self._reservations
+            if res.date == date and res.time == time and res.status == "active"
+        )
 
     def cancel_reservation(self, reservation_id: str) -> bool:
         reservation = next((r for r in self._reservations if r.id == reservation_id), None)
