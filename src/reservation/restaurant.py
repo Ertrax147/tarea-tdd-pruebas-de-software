@@ -47,4 +47,8 @@ class Restaurant:
         return True
 
     def get_reservations_by_date(self, date: str) -> list[Reservation]:
-        raise NotImplementedError
+        return [r for r in self._reservations if self._matches_active_date(r, date)]
+
+    @staticmethod
+    def _matches_active_date(reservation: Reservation, date: str) -> bool:
+        return reservation.date == date and reservation.status == "active"

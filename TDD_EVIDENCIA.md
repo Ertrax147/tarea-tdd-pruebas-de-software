@@ -400,3 +400,169 @@ No se aplicó una refactorización adicional propia de RF03 en este ciclo, ya qu
 | 3 | Ya cancelada → `ValueError` | `1592982` | `221b6aa` | 3 passed |
 | 4 | Liberación de capacidad | `6508fe9` | integrado vía merge `68266ad`, ajustado en `bfbde7a` | 4 passed |
 
+## Funcionalidad: RF04 - Consultar Reservas
+
+Los siguientes 2 ciclos documentan el desarrollo de `Restaurant.get_reservations_by_date`. La evidencia fue reconstruida ejecutando pytest sobre cada commit real de la rama `feature/RF-04`.
+
+### Ciclo 1 - Filtrar reservas por fecha
+
+### 1. Comportamiento a implementar
+El comportamiento buscado era permitir consultar todas las reservas asociadas a una fecha determinada mediante `Restaurant.get_reservations_by_date`, retornando únicamente las reservas cuya fecha coincide con la solicitada.
+
+### 2. RED - Prueba inicial
+Commit RED: `test: add test for filtering reservations by date`
+
+Se creó el archivo `tests/test_queries.py` con la siguiente prueba:
+
+​```python
+def test_get_reservations_by_date_returns_only_matching_date(restaurant):
+    restaurant.create_reservation("Juan Pérez", 4, "2026-09-01", "20:00")
+    restaurant.create_reservation("Ana López", 2, "2026-09-01", "21:00")
+    restaurant.create_reservation("Pedro Gómez", 3, "2026-09-01", "19:30")
+    restaurant.create_reservation("Otro Cliente", 2, "2026-09-02", "20:00")
+
+    reservations = restaurant.get_reservations_by_date("2026-09-01")
+
+    assert len(reservations) == 3
+    assert all(r.date == "2026-09-01" for r in reservations)
+​```
+
+### 3. ¿Por qué falló?
+Comando ejecutado:
+
+​```powershell
+pytest tests/test_queries.py
+​```
+
+Resultado:
+
+​```text
+FAILED tests/test_queries.py::test_get_reservations_by_date_returns_only_matching_date - NotImplementedError
+src\reservation\restaurant.py:32: NotImplementedError
+1 failed in 0.10s
+​```
+
+El fallo ocurrió porque `Restaurant.get_reservations_by_date` todavía contenía `raise NotImplementedError`, es decir, el comportamiento de RF04 aún no estaba implementado. No se trató de un error de sintaxis, imports ni configuración: la prueba expuso correctamente una funcionalidad pendiente.
+
+### 4. GREEN - Implementación mínima
+Commit GREEN: `feat: implement get_reservations_by_date`
+
+Se reemplazó el método en `src/reservation/restaurant.py` por coincidencia de fecha:
+
+​```python
+def get_reservations_by_date(self, date: str) -> list[Reservation]:
+    return [r for r in self._reservations if r.date == date]
+​```
+
+Comando ejecutado:
+
+​```powershell
+pytest tests/test_queries.py
+​```
+
+Resultado:
+
+​```text
+collected 1 item                                                                                                                              
+
+tests\test_queries.py .                                                                                                                 [100%]
+
+=============================================================
+ 1 passed in 0.06s
+==============================================================
+​```
+Con este cambio, la prueba pasó (1 passed).
+
+#### 4. REFACTOR - Mejora realizada
+El método resultante tenía una sola responsabilidad y una condición simple, por lo que en este ciclo puntual no se identificó una mejora estructural adicional.
+
+---
+
+### Ciclo 2 - Excluir reservas canceladas
+
+#### 1. Comportamiento a implementar
+Las reservas con `status == "cancelled"` no deben aparecer en el resultado de `get_reservations_by_date`, aunque coincidan con la fecha consultada. Para mantener esta prueba autocontenida y no depender de la implementación de `cancel_reservation` (responsabilidad de RF03), el estado cancelado se simula asignando directamente el atributo `status` de la reserva.
+
+#### 2. RED - Prueba escrita inicialmente
+Commit: `test: exclude cancelled reservations from date query`
+
+```python
+def test_get_reservations_by_date_excludes_cancelled(restaurant):
+    active = restaurant.create_reservation("Juan Pérez", 4, "2026-09-01", "20:00")
+    cancelled = restaurant.create_reservation("Ana López", 2, "2026-09-01", "21:00")
+    cancelled.status = "cancelled"
+
+    reservations = restaurant.get_reservations_by_date("2026-09-01")
+
+    assert len(reservations) == 1
+    assert reservations[0].id == active.id
+```
+
+**Por qué falló:**
+```text
+    assert len(reservations) == 1
+E   AssertionError: assert 2 == 1
+E    +  where 2 = len([Reservation(id='f86ab840-...', ..., status='active'), Reservation(id='ac06c961-...', ..., status='cancelled')])
+tests\test_queries.py:28: AssertionError
+1 failed, 1 passed in 0.10s
+```
+`get_reservations_by_date` filtraba únicamente por `date`, sin considerar el `status` de la reserva. Por eso la reserva cancelada seguía apareciendo en el resultado junto con la activa.
+
+#### 3. GREEN - Implementación mínima
+Commit: `feat: filter out cancelled reservations in date query`
+
+```python
+def get_reservations_by_date(self, date: str) -> list[Reservation]:
+    return [
+        r for r in self._reservations
+        if r.date == date and r.status == "active"
+    ]
+```
+
+```text
+(venv) PS C:\Users\ASUS\Documents\GitHub\tarea-tdd-pruebas-de-software> pytest tests/test_queries.py -v
+====================================================================== test session starts ======================================================================
+platform win32 -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\ASUS\Documents\GitHub\tarea-tdd-pruebas-de-software\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\ASUS\Documents\GitHub\tarea-tdd-pruebas-de-software
+configfile: pyproject.toml
+collected 2 items                                                                                                                                                
+
+tests/test_queries.py::test_get_reservations_by_date_returns_only_matching_date PASSED                                                                     [ 50%]
+tests/test_queries.py::test_get_reservations_by_date_excludes_cancelled PASSED                                                                             [100%]
+
+======================================================================= 2 passed in 0.02s =======================================================================
+```
+
+#### 4. REFACTOR - Mejora realizada
+Commit: - `refactor: extract active-date matching condition`
+
+La condición combinaba dos criterios (`fecha` y `status`) dentro de la comprehension, lo que reducía su legibilidad. Se extrajo a un método privado con nombre expresivo:
+
+```python
+def get_reservations_by_date(self, date: str) -> list[Reservation]:
+    return [r for r in self._reservations if self._matches_active_date(r, date)]
+
+@staticmethod
+def _matches_active_date(reservation: Reservation, date: str) -> bool:
+    return reservation.date == date and reservation.status == "active"
+```
+
+El comportamiento observable no cambió; se confirmó ejecutando la suite completa, la cual continuó pasando en su totalidad.
+
+```text
+(venv) PS C:\Users\ASUS\Documents\GitHub\tarea-tdd-pruebas-de-software> pytest
+====================================================================== test session starts ======================================================================
+platform win32 -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\ASUS\Documents\GitHub\tarea-tdd-pruebas-de-software
+configfile: pyproject.toml
+testpaths: tests
+collected 17 items                                                                                                                                               
+
+tests\test_queries.py ..                                                                                                                                   [ 11%]
+tests\test_reservation.py ...............                                                                                                                  [100%]
+
+====================================================================== 17 passed in 0.04s =======================================================================
+```
+
+---
