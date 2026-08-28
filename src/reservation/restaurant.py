@@ -31,6 +31,9 @@ class Restaurant:
         if reservation is None:
             return False
             
+        if reservation.status == "cancelled":
+            raise ValueError("La reserva ya está cancelada")
+            
         reservation.status = "cancelled"
         return True
 
