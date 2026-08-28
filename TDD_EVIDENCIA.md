@@ -227,3 +227,28 @@ tests\test_queries.py:28: AssertionError
 ```
 `get_reservations_by_date` filtraba únicamente por `date`, sin considerar el `status` de la reserva. Por eso la reserva cancelada seguía apareciendo en el resultado junto con la activa.
 
+#### 3. GREEN - Implementación mínima
+Commit: `feat: filter out cancelled reservations in date query`
+
+```python
+def get_reservations_by_date(self, date: str) -> list[Reservation]:
+    return [
+        r for r in self._reservations
+        if r.date == date and r.status == "active"
+    ]
+```
+
+```text
+(venv) PS C:\Users\ASUS\Documents\GitHub\tarea-tdd-pruebas-de-software> pytest tests/test_queries.py -v
+====================================================================== test session starts ======================================================================
+platform win32 -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\ASUS\Documents\GitHub\tarea-tdd-pruebas-de-software\venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\ASUS\Documents\GitHub\tarea-tdd-pruebas-de-software
+configfile: pyproject.toml
+collected 2 items                                                                                                                                                
+
+tests/test_queries.py::test_get_reservations_by_date_returns_only_matching_date PASSED                                                                     [ 50%]
+tests/test_queries.py::test_get_reservations_by_date_excludes_cancelled PASSED                                                                             [100%]
+
+======================================================================= 2 passed in 0.02s =======================================================================
+```
