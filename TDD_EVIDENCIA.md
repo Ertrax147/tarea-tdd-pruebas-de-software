@@ -1,8 +1,8 @@
 # Evidencia de ciclos TDD
 
-Este documento registra la evidencia de los ciclos Red -> Green -> Refactor utilizados durante el desarrollo del módulo de gestión de reservas de restaurante. Por ahora se documenta únicamente el primer ciclo, correspondiente a RF01.
+Este documento registra la evidencia de los ciclos Red -> Green -> Refactor utilizados durante el desarrollo del módulo de gestión de reservas de restaurante.
 
-La evidencia fue reconstruida a partir del estado actual del repositorio, las pruebas en `tests/test_reservation.py`, el código de producción en `src/reservation/`, la configuración de `pytest` en `pyproject.toml` y el historial de Git.
+La evidencia fue reconstruida a partir del estado actual del repositorio, las pruebas en `tests/*`, el código de producción en `src/reservation/`, la configuración de `pytest` en `pyproject.toml` y el historial de Git.
 
 ## Ciclo 1 - Creación y validación de reservas (RF01)
 
@@ -170,3 +170,233 @@ Se agregó un bloque condicional en `create_reservation` que lanza un `ValueErro
 
 #### 4. REFACTOR - Mejora realizada
 No se realizó refactorización adicional en este ciclo ya que la validación agregada era limpia, delegaba correctamente la verificación a `check_availability` y no introducía duplicación.
+
+## Funcionalidad: RF03 - Cancelación de Reservas
+
+Los siguientes 4 ciclos documentan el desarrollo de `Restaurant.cancel_reservation` y la verificación de liberación de capacidad mediante `check_availability`. La evidencia fue reconstruida ejecutando `pytest` sobre cada commit real del historial de la rama.
+
+### Ciclo 1 - Cancelación exitosa de una reserva
+
+#### 1. Comportamiento a implementar
+Al cancelar una reserva existente indicando su código (`id`), el sistema debe cambiar su estado a `"cancelled"`.
+
+#### 2. RED - Prueba escrita inicialmente
+Commit: `test: verify successful cancellation changes status to cancelled` (`89be80b`)
+
+```python
+def test_cancel_valid_reservation_changes_status():
+    restaurant = Restaurant(capacity_per_slot=30)
+    reservation = restaurant.create_reservation("Cliente A", 5, "2026-08-30", "20:00")
+
+    restaurant.cancel_reservation(reservation.id)
+
+    updated_res = next(r for r in restaurant._reservations if r.id == reservation.id)
+    assert updated_res.status == "cancelled"
+```
+
+**Por qué falló:** `cancel_reservation` todavía era `raise NotImplementedError` (heredado de `develop`). La ejecución mostró:
+
+```text
+    def cancel_reservation(self, reservation_id: str) -> bool:
+>       raise NotImplementedError
+E       NotImplementedError
+src/reservation/restaurant.py:29: NotImplementedError
+FAILED tests/test_cancellation.py::test_cancel_valid_reservation_changes_status
+1 failed in 0.02s
+```
+
+#### 3. GREEN - Implementación mínima
+Commit: `feat: implement basic cancel_reservation logic` (`b71450c`)
+
+Se implementó la lógica mínima: buscar la reserva por `id` usando `next()`, y si existe, cambiar su `status` a `"cancelled"` y retornar `True`; si no existe, retornar `False`.
+
+```python
+def cancel_reservation(self, reservation_id: str) -> bool:
+        reservation = next((r for r in self._reservations if r.id == reservation_id), None)
+        if reservation:
+            reservation.status = "cancelled"
+            return True
+        return False
+```
+
+Con este cambio, la prueba pasó (1 passed).
+
+#### 4. REFACTOR - Mejora realizada
+No se realizó una refactorización separada en este ciclo: la indentación irregular introducida en el paso GREEN (bloque `cancel_reservation` con sangría extra) se corrigió en el commit `feat: validate id existence in cancel_reservation` (`2cf96c6`), reordenando el método con *early return* (`if reservation is None: return False`) antes de continuar con la lógica de cancelación. Este ajuste de estilo se documenta también como parte del Ciclo 6, ya que no modificó comportamiento y las pruebas continuaron en verde.
+
+---
+
+### Ciclo 2 - Cancelación con código de reserva inexistente
+
+#### 1. Comportamiento a implementar
+Si el código de reserva (`id`) no corresponde a ninguna reserva registrada, `cancel_reservation` debe retornar `False` sin lanzar excepciones.
+
+#### 2. RED - Prueba escrita inicialmente
+Commit: `test: return false when cancelling non-existent reservation id` (`b759af3`)
+
+```python
+def test_cancel_nonexistent_code_returns_false():
+    restaurant = Restaurant(capacity_per_slot=30)
+    result = restaurant.cancel_reservation("FAKE-ID")
+
+    assert result is False
+```
+
+**Resultado real al escribir la prueba:** a diferencia de los demás ciclos, esta prueba **ya pasaba** en el momento de escribirla (`2 passed`), porque la implementación mínima del Ciclo 1 (`b71450c`) ya cubría el caso "no encontrado" con `return False` como parte de su rama `if/else`. Es decir, la generalización natural del primer `GREEN` satisfizo este comportamiento antes de tener una prueba dedicada. Se documenta igualmente como ciclo porque agrega cobertura de prueba explícita y permanente sobre una regla de negocio distinta (RF03: "código de reserva inexistente").
+
+#### 3. GREEN / consolidación
+Commit: `feat: validate id existence in cancel_reservation` (`2cf96c6`)
+
+Se reescribió el método con *early return* para dejar expreso el camino "no encontrado", mejorando la legibilidad sin cambiar el comportamiento:
+
+```python
+def cancel_reservation(self, reservation_id: str) -> bool:
+    reservation = next((r for r in self._reservations if r.id == reservation_id), None)
+
+    if reservation is None:
+        return False
+
+    reservation.status = "cancelled"
+    return True
+```
+
+Las 2 pruebas de `test_cancellation.py` existentes hasta ese punto continuaron pasando.
+
+#### 4. REFACTOR - Mejora realizada
+El cambio de `2cf96c6` cumple el rol de refactorización de este ciclo: separa claramente el camino de "reserva no encontrada" del camino de "reserva encontrada" mediante un *guard clause*, en lugar de anidar la lógica dentro de un `if reservation:`. No se requirió refactorización adicional.
+
+---
+
+### Ciclo 3 - Cancelación de una reserva ya cancelada
+
+#### 1. Comportamiento a implementar
+Si se cancela dos veces la misma reserva, la segunda cancelación debe lanzar `ValueError`, en lugar de permitir una doble cancelación silenciosa.
+
+#### 2. RED - Prueba escrita inicialmente
+Commit: `test: raise ValueError when cancelling an already cancelled reservation` (`1592982`)
+
+```python
+def test_cancel_already_cancelled_raises_error():
+    restaurant = Restaurant(capacity_per_slot=30)
+    reservation = restaurant.create_reservation("Cliente B", 2, "2026-08-30", "21:00")
+
+    restaurant.cancel_reservation(reservation.id)
+
+    with pytest.raises(ValueError, match="ya está cancelada"):
+        restaurant.cancel_reservation(reservation.id)
+```
+
+**Por qué falló:** la implementación del Ciclo 2 encontraba la reserva por `id` sin verificar su estado, y simplemente volvía a asignar `status = "cancelled"` y retornar `True`. La segunda llamada no lanzaba ninguna excepción:
+
+```text
+    with pytest.raises(ValueError, match="ya está cancelada"):
+>       restaurant.cancel_reservation(reservation.id)
+E       Failed: DID NOT RAISE ValueError
+tests/test_cancellation.py:25: Failed
+FAILED tests/test_cancellation.py::test_cancel_already_cancelled_raises_error
+1 failed, 2 passed in 0.02s
+```
+
+#### 3. GREEN - Implementación mínima
+Commit: `feat: verify reservation status before cancelling` (`221b6aa`)
+
+Se agregó una verificación de estado antes de reasignar `status`: si la reserva ya estaba `"cancelled"`, se lanza `ValueError("La reserva ya está cancelada")`.
+
+```python
+def cancel_reservation(self, reservation_id: str) -> bool:
+    reservation = next((r for r in self._reservations if r.id == reservation_id), None)
+
+    if reservation is None:
+        return False
+
+    if reservation.status == "cancelled":
+        raise ValueError("La reserva ya está cancelada")
+
+    reservation.status = "cancelled"
+    return True
+```
+
+Con este cambio, las 3 pruebas de `test_cancellation.py` pasaron.
+
+#### 4. REFACTOR - Mejora realizada
+No se realizó una refactorización estructural adicional en este ciclo: el bloque de validación agregado es pequeño, se ubica junto a la búsqueda de la reserva y no introduce duplicación. Se mantuvo el diseño simple, evitando sobre-ingeniería sobre un método que aún no lo justificaba.
+
+---
+
+### Ciclo 4 - Liberación de capacidad al cancelar
+
+#### 1. Comportamiento a implementar
+Al cancelar una reserva, la capacidad disponible para esa fecha y hora (consultada mediante `check_availability`) debe restaurarse, excluyendo la reserva cancelada del cálculo.
+
+#### 2. RED - Prueba escrita inicialmente
+Commit: `test: verify availability is restored after cancellation` (`6508fe9`)
+
+```python
+def test_cancel_reservation_frees_capacity():
+    restaurant = Restaurant(capacity_per_slot=30)
+    reservation = restaurant.create_reservation("Cliente C", 10, "2026-08-30", "19:00")
+
+    initial_capacity = restaurant.check_availability("2026-08-30", "19:00")
+    restaurant.cancel_reservation(reservation.id)
+    restored_capacity = restaurant.check_availability("2026-08-30", "19:00")
+
+    assert restored_capacity == initial_capacity + 10
+```
+
+**Por qué falló:** en ese punto de la rama `feature/rf-03-cancelacion`, `check_availability` aún era `raise NotImplementedError` (su implementación pertenece a RF02 y todavía no se había integrado a esta rama):
+
+```text
+    def check_availability(self, date: str, time: str) -> int:
+>       raise NotImplementedError
+E       NotImplementedError
+src/reservation/restaurant.py:26: NotImplementedError
+FAILED tests/test_cancellation.py::test_cancel_reservation_frees_capacity
+1 failed, 3 passed in 0.02s
+```
+
+#### 3. GREEN - Implementación
+La implementación de `check_availability` no se escribió en esta rama, sino que se incorporó al integrar la rama `feature/RF02` mediante el **merge** `Merge pull request #1 from Ertrax147/develop` (`68266ad`), que trajo la implementación desarrollada por el compañero de RF02:
+
+```python
+def check_availability(self, date: str, time: str) -> int:
+    return self.capacity_per_slot - self._get_reserved_capacity(date, time)
+
+def _get_reserved_capacity(self, date: str, time: str) -> int:
+    return sum(
+        res.party_size for res in self._reservations
+        if res.date == date and res.time == time and res.status == "active"
+    )
+```
+
+Como `cancel_reservation` cambia el `status` de la reserva a `"cancelled"`, y `_get_reserved_capacity` sólo suma reservas con `status == "active"`, la capacidad se libera automáticamente al cancelar. Tras el merge, la prueba `test_cancel_reservation_frees_capacity` pasó.
+
+Posteriormente, en el commit `test: update capacity test to use official check_availability method` (`bfbde7a`), se ajustó la prueba para usar valores absolutos y explícitos en lugar de relativos, verificando puntualmente los números de negocio del enunciado (capacidad 30, reserva de 10 personas):
+
+```python
+def test_cancel_reservation_frees_capacity():
+    restaurant = Restaurant(capacity_per_slot=30)
+    reservation = restaurant.create_reservation("Cliente C", 10, "2026-08-30", "19:00")
+
+    initial_capacity = restaurant.check_availability("2026-08-30", "19:00")
+    assert initial_capacity == 20
+    restaurant.cancel_reservation(reservation.id)
+    restored_capacity = restaurant.check_availability("2026-08-30", "19:00")
+    assert restored_capacity == 30
+```
+
+#### 4. REFACTOR - Mejora realizada
+No se aplicó una refactorización adicional propia de RF03 en este ciclo, ya que la lógica de cálculo de capacidad (`_get_reserved_capacity`) fue diseñada y refactorizada por el compañero responsable de RF02 (commit `refactor: extract reserved capacity calculation`, en su propia rama). Del lado de RF03, el único ajuste posterior fue de precisión en la prueba (valores absolutos en `bfbde7a`), sin cambios en el código de producción.
+
+**Nota de integración:** este ciclo evidencia un punto de coordinación real entre equipos: RF03 necesitaba `check_availability` (responsabilidad de RF02) para poder verificar la liberación de capacidad de punta a punta. La prueba quedó en estado RED durante el desarrollo aislado de la rama, y sólo se resolvió al integrar (merge) el trabajo de RF02.
+
+---
+
+### Resumen de RF03 (Cancelación de reservas)
+
+| Ciclo | Comportamiento | Commit RED | Commit GREEN | Resultado |
+| --- | --- | --- | --- | --- |
+| 1 | Cancelación exitosa | `89be80b` | `b71450c` | 1 passed |
+| 2 | Código inexistente → `False` | `b759af3` | `2cf96c6` | 2 passed |
+| 3 | Ya cancelada → `ValueError` | `1592982` | `221b6aa` | 3 passed |
+| 4 | Liberación de capacidad | `6508fe9` | integrado vía merge `68266ad`, ajustado en `bfbde7a` | 4 passed |
+
